@@ -17,38 +17,9 @@ const ColorChannelR uint8 = 0
 const ColorChannelG uint8 = 100
 const ColorChannelB uint8 = 200
 
-/*
-TODO:
-- read in a file (first hard coded, later by passing path as argument in the cli)
-- use the binary stream (or hex if dorectly available idk) and use it to set the pixels of an image
-- create multiple images like this
-- make video from these images
-- video name should be the name of the file read in at the beginnings
-
-- make a decoder that reads a video
-- gets each frame (frame rate will be defined in my encoder I guess)
-- reads each "pixel's" rgb hex values (3 Bytes, one per color channel)
-(a "pixel" might become bigger than an actual pixel e.g. 2*2 pixels, evaluate later how much youtube video compression affects it)
-- writes the read out values to a new file, in the end I should have a copy of the file I encoded previously
-*/
-
 func main() {
-	/*
-		TODO: fix following error when converting inet_exp.png
-		panic: runtime error: slice bounds out of range [:30000] with capacity 29997
-
-		goroutine 1 [running]:
-		main.encodeSingleImage(0x14000074e60, 0x752d, 0x2, 0x1)
-			/Users/friedrich.burmeister/projects/file_to_video/encoder.go:158 +0x350
-		main.encode(0x14000050020)
-			/Users/friedrich.burmeister/projects/file_to_video/encoder.go:109 +0x110
-		main.main()
-			/Users/friedrich.burmeister/projects/file_to_video/encoder.go:50 +0x6c
-		exit status 2
-	*/
-
 	// TODO: read file from console input
-	const FileToRead string = "test2.txt"
+	const FileToRead string = "inet_exp.png"
 
 	setup()
 
@@ -121,7 +92,6 @@ func encode(file *os.File) {
 func encodeSingleImage(reader *bufio.Reader, bytesToRead int, totalImageCount int, n int) {
 	bytes := make([]byte, bytesToRead)
 
-	// todo use for case when its the last image to set all remaining pixels to 0,0,0
 	bytesRead, err := reader.Read(bytes)
 
 	if err != nil {
@@ -131,7 +101,7 @@ func encodeSingleImage(reader *bufio.Reader, bytesToRead int, totalImageCount in
 	upLeft := image.Point{X: 0, Y: 0}
 	lowRight := image.Point{X: ImageWidth, Y: ImageHeight}
 	rectangle := image.Rectangle{Min: upLeft, Max: lowRight}
-	imageData := image.NewRGBA(rectangle) // todo what's the diff between rgba and rgba64 ???
+	imageData := image.NewRGBA(rectangle)
 
 	isLastImage := n == totalImageCount
 	decoderInstructionNotLastImage := color.RGBA{R: 255, G: 255, B: 255, A: 0xff}
@@ -141,17 +111,19 @@ func encodeSingleImage(reader *bufio.Reader, bytesToRead int, totalImageCount in
 	for y := 0; y < ImageHeight; y++ {
 		for x := 0; x < ImageWidth; x++ {
 			if x == 0 && y == 0 {
+				// continue needed to not overwrite the first pixel and also to not increase the offset
+
 				if isLastImage {
 					imageData.Set(
 						x,
 						y,
 						encodeLastBytePosition(bytesRead),
 					)
-
-					continue
+				} else {
+					imageData.Set(0, 0, decoderInstructionNotLastImage)
 				}
 
-				imageData.Set(0, 0, decoderInstructionNotLastImage)
+				continue
 			}
 
 			encodeSinglePixel(
@@ -160,6 +132,7 @@ func encodeSingleImage(reader *bufio.Reader, bytesToRead int, totalImageCount in
 				y,
 				bytes[offset:offset+3],
 			)
+
 			offset += 3
 		}
 	}
@@ -240,113 +213,28 @@ func encodeLastBytePosition(bytesToEncode int) color.RGBA {
 	}
 }
 
-// todo remove
-func keepStuffToNotLooseImports(file *os.File) {
-	fileInfo, _ := file.Stat()
-	fmt.Printf("file size: %d bytes\n", fileInfo.Size())
-
-	// todo could iterate until read bytes == 0
-	bytesToRead := 10
-	byteData := make([]byte, bytesToRead)
-
-	bytesActuallyRead, _ := file.Read(byteData)
-
-	fmt.Printf("%d bytes read\n", bytesActuallyRead)
-
-	fmt.Printf(
-		"%d bytes: %s\n",
-		bytesActuallyRead,
-		string(byteData[:bytesActuallyRead]),
-	)
-
-	// todo how to create an image / a frame of a video?
-	// - create image, store in out dir
-	// - read images from out dir, create video
-
-	// todo how will I tell the decoder where the files data ends?
-	//  -> encode somewhere how many bytes are encoded in a single frame
-
-	// bytes storable per image = height * width * color_channels = 200 * 200 * 3 = 120_000
-	width := 200
-	height := 200
-	upLeft := image.Point{X: 0, Y: 0}
-	lowRight := image.Point{X: width, Y: height}
-	rectangle := image.Rectangle{Min: upLeft, Max: lowRight}
-
-	imageData := image.NewRGBA(rectangle)
-	// now can set colors like: imageData.Set(123, 123, color.RGBA{123, 123, 123, 0xff})
-	//color.RGBA{} // image/color
-	//png.Encode() // image/png
-
-	color1 := color.RGBA{R: 255, G: 127, B: 127, A: 0xff}
-	color2 := color.RGBA{R: 255, G: 255, B: 255, A: 0xff}
-
-	for x := 0; x < width; x++ {
-		for y := 0; y < height; y++ {
-			colorToSet := color1
-
-			if x > 100 && y > 100 {
-				colorToSet = color2
-			}
-
-			// if no color is set the pixel automatically becomes invisible
-
-			imageData.Set(x, y, colorToSet)
-		}
-	}
-
-	imageFile, _ := os.Create("image.png")
-	defer imageFile.Close()
-
-	png.Encode(imageFile, imageData)
-
-}
-
 func setup() {
 	_, err := os.Stat(OutputDirectory)
 	dirDoesNotExist := os.IsNotExist(err)
 
 	if dirDoesNotExist {
-		fmt.Println("output directory not found - creating...")
-
-		// create directory with permissions rwx
-		err = os.Mkdir(OutputDirectory, os.ModeDir|os.ModePerm)
+		createOutputDirectory()
+	} else {
+		err = os.RemoveAll(OutputDirectory)
 
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Println("output directory created")
+		createOutputDirectory()
 	}
-	// todo: else: delete it's content
 }
 
-/*fmt.Println("converting file to video...")
+func createOutputDirectory() {
+	// create directory with permissions rwx
+	err := os.Mkdir(OutputDirectory, os.ModeDir|os.ModePerm)
 
-  const FileToRead string = "test1.txt"
-
-  file, err := os.Open(FileToRead)
-
-  if err != nil {
-  	fmt.Println(err)
-  }
-
-  defer file.Close()
-
-  reader := bufio.NewReader(file)
-  byteRead, err := reader.ReadByte()
-
-  if err != nil {
-  	fmt.Println(err)
-  }
-
-  fmt.Println(byteRead)
-
-  byteRead, err = reader.ReadByte()
-  reader.Size()
-
-  if err != nil {
-  	fmt.Println(err)
-  }
-
-  fmt.Println(byteRead)*/
+	if err != nil {
+		panic(err)
+	}
+}
