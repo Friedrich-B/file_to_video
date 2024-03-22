@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"math"
 	"os"
+	"os/exec"
 )
 
 const OutputDirectory string = "out"
@@ -19,7 +20,7 @@ const ColorChannelB uint8 = 200
 
 func main() {
 	// TODO: read file from console input
-	const FileToRead string = "inet_exp.png"
+	const FileToRead string = "large.jpg"
 
 	setup()
 
@@ -32,40 +33,36 @@ func main() {
 
 	defer file.Close()
 
-	encode(file)
-}
+	encodeFileToPNGs(file)
 
-func createSampleImage() {
-	black := color.RGBA{R: 0, G: 0, B: 0, A: 0xff}
-	white := color.RGBA{R: 255, G: 255, B: 255, A: 0xff}
+	ffmpegCommand := exec.Command(
+		"ffmpeg",
+		"-framerate",
+		"1",
+		"-i",
+		"out/%d.png",
+		"-c:v",
+		"libx264",
+		"-r",
+		"1",
+		fmt.Sprintf(
+			"%s/%s.mp4",
+			OutputDirectory,
+			FileToRead,
+		),
+	)
 
-	upLeft := image.Point{X: 0, Y: 0}
-	lowRight := image.Point{X: ImageWidth, Y: ImageHeight}
-	rectangle := image.Rectangle{Min: upLeft, Max: lowRight}
-	imageData := image.NewRGBA(rectangle)
+	err = ffmpegCommand.Run()
 
-	for x := 0; x < ImageWidth; x++ {
-		for y := 0; y < ImageHeight; y++ {
-			colorToSet := black
-
-			isUpLeft := x < 50 && y < 50
-			isBottemRight := x > 50 && y > 50
-
-			if isUpLeft || isBottemRight {
-				colorToSet = white
-			}
-
-			imageData.Set(x, y, colorToSet)
-		}
+	if err != nil {
+		fmt.Println("error when converting images to video,", err)
+		panic(err)
 	}
 
-	imageFile, _ := os.Create(OutputDirectory + "/" + "sample.png")
-	defer imageFile.Close()
-
-	png.Encode(imageFile, imageData)
+	fmt.Printf("finished converting file %s to into a video\n", FileToRead)
 }
 
-func encode(file *os.File) {
+func encodeFileToPNGs(file *os.File) {
 	reader := bufio.NewReader(file)
 	fileStats, _ := file.Stat()
 
