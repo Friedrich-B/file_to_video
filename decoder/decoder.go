@@ -6,7 +6,6 @@ import (
 	"image"
 	"os"
 	"os/exec"
-	"strings"
 )
 
 const OutputDirectory string = "out-decoder"
@@ -42,25 +41,18 @@ func Decode() {
 		panic(err)
 	}
 
-	directoryContent, err := os.ReadDir(OutputDirectory)
+	inputFileInfo, err := inputVideo.Stat()
 
 	if err != nil {
-		fmt.Println("error when opening output directory")
+		fmt.Println("error when getting file info")
 		panic(err)
 	}
 
-	imageCount := len(directoryContent)
-
-	replacedString := strings.ReplaceAll(
-		inputVideo.Name(),
-		"/",
-		"_",
-	)
-
+	inputFileName := inputFileInfo.Name()
 	outputFileName := fmt.Sprintf(
 		"%s/%s",
 		OutputDirectory,
-		replacedString[0:len(replacedString)-4],
+		inputFileName[0:len(inputFileName)-4],
 	)
 
 	outputFile, err := os.Create(outputFileName)
@@ -71,6 +63,16 @@ func Decode() {
 
 	defer outputFile.Close()
 
+	directoryContent, err := os.ReadDir(OutputDirectory)
+
+	if err != nil {
+		fmt.Println("error when opening output directory")
+		panic(err)
+	}
+
+	// subtract 1 to get correct count because output file already created
+	imageCount := len(directoryContent) - 1
+
 	for i := 1; i <= imageCount; i++ {
 		if i == imageCount {
 			decodeLastImage(i, outputFile)
@@ -79,7 +81,7 @@ func Decode() {
 		}
 	}
 
-	fmt.Printf("finished decoding %s\n", inputVideo.Name())
+	fmt.Printf("finished decoding %s\n", inputFileName)
 }
 
 func decodeSingleImage(n int, outputFile *os.File) {
