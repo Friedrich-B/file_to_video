@@ -10,16 +10,13 @@ import (
 
 const OutputDirectory string = "out-decoder"
 
-func Decode() {
+func Decode(fileToOpen string) {
 	setup.OutputDirectory(OutputDirectory)
 
-	// TODO: read from console input
-	const FileToOpen = "out-encoder/large.jpg.mp4"
-
-	inputVideo, err := os.Open(FileToOpen)
+	inputVideo, err := os.Open(fileToOpen)
 
 	if err != nil {
-		fmt.Printf("error when opening file %s\n", FileToOpen)
+		fmt.Printf("error when opening file %s\n", fileToOpen)
 		panic(err)
 	}
 
@@ -28,7 +25,7 @@ func Decode() {
 	createImagesCommand := exec.Command(
 		"ffmpeg",
 		"-i",
-		FileToOpen,
+		fileToOpen,
 		"-vf",
 		"fps=1",
 		fmt.Sprintf("%s/%s", OutputDirectory, "%d.png"),

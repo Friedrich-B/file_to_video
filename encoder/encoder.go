@@ -14,13 +14,10 @@ import (
 
 const OutputDirectory string = "out-encoder"
 
-func Encode() {
-	// TODO: read file from console input
-	const FileToRead string = "large.jpg"
-
+func Encode(fileToRead string) {
 	setup.OutputDirectory(OutputDirectory)
 
-	file, err := os.Open(FileToRead)
+	file, err := os.Open(fileToRead)
 
 	if err != nil {
 		fmt.Println("error when opening file")
@@ -43,7 +40,7 @@ func Encode() {
 		"0",
 		"-r",
 		"1",
-		fmt.Sprintf("%s/%s.mp4", OutputDirectory, FileToRead),
+		fmt.Sprintf("%s/%s.mp4", OutputDirectory, fileToRead),
 	)
 
 	err = ffmpegCommand.Run()
@@ -53,7 +50,7 @@ func Encode() {
 		panic(err)
 	}
 
-	fmt.Printf("finished encoding %s\n", FileToRead)
+	fmt.Printf("finished encoding %s\n", fileToRead)
 }
 
 func encodeFileToPNGs(file *os.File) {
